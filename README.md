@@ -5,24 +5,14 @@ Componente para edição de geometrias usando OpenLayers Editor (OLE), desenvolv
 ## Instalação
 
 ```bash
-composer require marcelonees/topenlayerseditor:dev-main
-
-
+composer config repositories.topenlayerseditor vcs https://github.com/marcelonees/topenlayerseditor
+composer require marcelonees/topenlayerseditor @dev
+composer require marcelonees/topenlayerseditor dev-main
+```
 
 ## Uso
-use MarceloNees\Plugins\OpenLayersEditor\OpenLayersEditor;
 
-$editor = new OpenLayersEditor([
-    'useOLE' => true,
-    'showToolbar' => true
-]);
-$editor->setSize('100%', '500px');
-$editor->setGeometry($geomData);
-
-
-
-
-
+```php
 use MarceloNees\Plugins\OpenLayersEditor\OpenLayersEditor;
 
 $editor = new OpenLayersEditor([
@@ -38,3 +28,4 @@ TScript::create("
         document.getElementById('geom_field').value = e.detail.geometry;
     });
 ");
+```
