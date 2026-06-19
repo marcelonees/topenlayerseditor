@@ -17,15 +17,9 @@ use MarceloNees\Plugins\OpenLayersEditor\OpenLayersEditor;
 
 $editor = new OpenLayersEditor([
     'useOLE' => true,
+    'showToolbar' => true,
     'assetsPath' => 'vendor/marcelonees/topenlayerseditor/src/OpenLayersEditor/'
 ]);
 $editor->setSize('100%', '500px');
 $editor->setGeometry($geomData);
-
-/* Escuta mudanças */
-TScript::create("
-    document.addEventListener('geometryChanged', function(e) {
-        document.getElementById('geom_field').value = e.detail.geometry;
-    });
-");
 ```
