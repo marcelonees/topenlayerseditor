@@ -1,0 +1,22 @@
+{
+  "name": "marcelonees/topenlayerseditor",
+  "description": "Componente para edição de geometrias usando OpenLayers Editor (OLE)",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Marcelo Barreto Nees",
+      "email": "marcelo.linux@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "MarceloNees\\Plugins\\OpenLayersEditor\\": "src/OpenLayersEditor/"
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
