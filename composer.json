@@ -1,6 +1,6 @@
 {
   "name": "marcelonees/topenlayerseditor",
-  "description": "Componente para edição de geometrias usando OpenLayers Editor (OLE)",
+  "description": "Componente para edição de geometrias usando OpenLayers Editor (OLE) para o Framework Adianti",
   "type": "library",
   "license": "MIT",
   "authors": [
@@ -9,9 +9,7 @@
       "email": "marcelo.linux@gmail.com"
     }
   ],
-  "require": {
-    "php": ">=7.0"
-  },
+  "require": {},
   "autoload": {
     "psr-4": {
       "MarceloNees\\Plugins\\OpenLayersEditor\\": "src/OpenLayersEditor/"
