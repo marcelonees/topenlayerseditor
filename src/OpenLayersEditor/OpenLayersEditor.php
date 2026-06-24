@@ -52,14 +52,6 @@ class OpenLayersEditor extends TElement
                 'opacity' => 0.3,
                 'visible' => true,
                 'title' => 'OpenStreetMap'
-            ],
-            'ortomosaico' => [
-                'type' => 'xyz',
-                'url' => 'https://www.jaraguadosul.sc.gov.br/geo/ortomosaico2020/{z}/{x}/{y}.png',
-                'maxZoom' => 19,
-                'opacity' => 1.0,
-                'visible' => true,
-                'title' => 'Ortomosaico 2020'
             ]
         ];
 
