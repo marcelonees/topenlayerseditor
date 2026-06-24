@@ -10,7 +10,7 @@ use Adianti\Widget\Base\TStyle;
  * OpenLayersEditor - Componente para edição de geometrias
  * 
  * @author Marcelo Barreto Nees <marcelo.linux@gmail.com>
- * @version 1.1 - TOOLBAR COM ÍCONES E TOOLTIPS
+ * @version 1.2 - MÉTODO PHP PARA RESTAURAR CONFIGURAÇÕES
  * @package MarceloNees\Plugins\OpenLayersEditor
  */
 class OpenLayersEditor extends TElement
@@ -24,6 +24,9 @@ class OpenLayersEditor extends TElement
     private $options = [];
     private $mapContainerId;
     private $layers = [];
+    private $editorConfigFieldId = null;
+    private $geometryFieldId = null;
+    private $restoreConfigData = null; // Armazena dados para restauração
 
     public function __construct($options = [])
     {
@@ -60,7 +63,6 @@ class OpenLayersEditor extends TElement
             ]
         ];
 
-        /* Opções padrão */
         $this->options = array_merge([
             'showToolbar' => true,
             'toolbarButtons' => $defaultButtons,
@@ -70,13 +72,19 @@ class OpenLayersEditor extends TElement
             'freehand' => false,
             'showLayerControl' => true,
             'layers' => $defaultLayers,
-            'showToolbarLabels' => true, /* Novo: controla se mostra labels na toolbar */
-            'toolbarPosition' => 'top-right' /* top-right, top-left, bottom-right, bottom-left */
+            'showToolbarLabels' => true,
+            'toolbarPosition' => 'top-right',
+            'editorConfigField' => null,
+            'geometryField' => null,
+            'restoreConfig' => null // Dados de configuração para restaurar
         ], $options);
 
         $this->center = $this->options['center'];
         $this->zoom = $this->options['zoom'];
         $this->layers = $this->options['layers'];
+        $this->editorConfigFieldId = $this->options['editorConfigField'];
+        $this->geometryFieldId = $this->options['geometryField'];
+        $this->restoreConfigData = $this->options['restoreConfig'];
     }
 
     public function setSize($width, $height)
@@ -130,24 +138,12 @@ class OpenLayersEditor extends TElement
         return $this;
     }
 
-    /**
-     * Define se a toolbar mostra labels ou apenas ícones
-     * 
-     * @param bool $showLabels
-     * @return self
-     */
     public function setShowToolbarLabels($showLabels)
     {
         $this->options['showToolbarLabels'] = (bool) $showLabels;
         return $this;
     }
 
-    /**
-     * Define a posição da toolbar
-     * 
-     * @param string $position top-right, top-left, bottom-right, bottom-left
-     * @return self
-     */
     public function setToolbarPosition($position)
     {
         $positions = ['top-right', 'top-left', 'bottom-right', 'bottom-left'];
@@ -155,6 +151,95 @@ class OpenLayersEditor extends TElement
             $this->options['toolbarPosition'] = $position;
         }
         return $this;
+    }
+
+    /**
+     * Define o campo que receberá as configurações completas do editor
+     * 
+     * @param string $fieldId ID do campo no formulário
+     * @return self
+     */
+    public function setEditorConfigField($fieldId)
+    {
+        $this->editorConfigFieldId = $fieldId;
+        $this->options['editorConfigField'] = $fieldId;
+        return $this;
+    }
+
+    /**
+     * Define o campo que receberá a geometria
+     * 
+     * @param string $fieldId ID do campo no formulário
+     * @return self
+     */
+    public function setGeometryField($fieldId)
+    {
+        $this->geometryFieldId = $fieldId;
+        $this->options['geometryField'] = $fieldId;
+        return $this;
+    }
+
+    /**
+     * Define os dados de configuração para restaurar
+     * 
+     * @param string|array $configData Dados de configuração (JSON string ou array)
+     * @return self
+     */
+    public function setRestoreConfig($configData)
+    {
+        if (is_array($configData)) {
+            $this->restoreConfigData = json_encode($configData);
+        } else {
+            $this->restoreConfigData = $configData;
+        }
+        $this->options['restoreConfig'] = $this->restoreConfigData;
+        return $this;
+    }
+
+    /**
+     * Método PHP para restaurar as configurações do editor
+     * Este método deve ser chamado após a criação do editor
+     * 
+     * @param string|array $configData Dados de configuração (JSON string ou array)
+     * @param int $delay Delay em milissegundos antes de restaurar (padrão: 1000)
+     * @return void
+     */
+    public function restoreConfig($configData = null, $delay = 1000)
+    {
+        if ($configData !== null) {
+            $this->setRestoreConfig($configData);
+        }
+
+        if ($this->restoreConfigData) {
+            $configJson = is_string($this->restoreConfigData) ?
+                $this->restoreConfigData :
+                json_encode($this->restoreConfigData);
+
+            TScript::create("
+                setTimeout(function() {
+                    if (typeof restoreEditorConfig === 'function') {
+                        console.log('🔄 Restaurando configurações via método PHP...');
+                        restoreEditorConfig({$configJson});
+                    } else {
+                        console.warn('⚠️ Função restoreEditorConfig não disponível');
+                    }
+                }, {$delay});
+            ");
+        }
+    }
+
+    /**
+     * Método estático para criar uma instância com restauração automática
+     * 
+     * @param array $options Opções do editor
+     * @param string|array $configData Dados de configuração para restaurar
+     * @return self
+     */
+    public static function createWithRestore($options, $configData)
+    {
+        $editor = new self($options);
+        $editor->setRestoreConfig($configData);
+        return $editor;
     }
 
     public function show()
@@ -180,6 +265,11 @@ class OpenLayersEditor extends TElement
         $this->loadAssets();
         $this->initMap();
 
+        /* Se houver dados de restauração, restaurar após o mapa carregar */
+        if ($this->restoreConfigData) {
+            $this->restoreConfig(null, 1500);
+        }
+
         parent::show();
     }
 
@@ -204,11 +294,12 @@ class OpenLayersEditor extends TElement
         $showLayerControl = $this->options['showLayerControl'] ? 'true' : 'false';
         $showToolbarLabels = $this->options['showToolbarLabels'] ? 'true' : 'false';
         $toolbarPosition = $this->options['toolbarPosition'];
+        $editorConfigFieldId = $this->editorConfigFieldId ? $this->editorConfigFieldId : '';
+        $geometryFieldId = $this->geometryFieldId ? $this->geometryFieldId : '';
 
         $showToolbar = $this->options['showToolbar'] ? 'true' : 'false';
         $toolbarButtons = json_encode($this->options['toolbarButtons']);
 
-        /* Mapear posições para CSS */
         $positionStyles = [
             'top-right' => 'top:10px;right:10px;bottom:auto;left:auto;',
             'top-left' => 'top:10px;left:10px;bottom:auto;right:auto;',
@@ -219,11 +310,10 @@ class OpenLayersEditor extends TElement
 
         TScript::create("
             (function() {
-                console.log('=== OpenLayersEditor - TOOLBAR COM ÍCONES E TOOLTIPS ===');
+                console.log('=== OpenLayersEditor - MÉTODO PHP PARA RESTAURAR ===');
                 console.log('Container ID: ' + '{$containerId}');
-                console.log('Freehand padrão: ' + ({$freehand} ? 'ATIVADO' : 'DESATIVADO'));
-                console.log('Mostrar labels: ' + ({$showToolbarLabels} ? 'SIM' : 'NÃO'));
-                console.log('Posição toolbar: ' + '{$toolbarPosition}');
+                console.log('Campo geometry: ' + ('{$geometryFieldId}' || 'nenhum'));
+                console.log('Campo editor config: ' + ('{$editorConfigFieldId}' || 'nenhum'));
                 
                 /* ======================================== */
                 /* VARIÁVEIS GLOBAIS                       */
@@ -251,6 +341,169 @@ class OpenLayersEditor extends TElement
                 var _isLayerControlCollapsed = false;
                 var _showToolbarLabels = {$showToolbarLabels};
                 var _toolbarPosition = '{$toolbarPosition}';
+                var _editorConfigFieldId = '{$editorConfigFieldId}';
+                var _geometryFieldId = '{$geometryFieldId}';
+                
+                /* ======================================== */
+                /* ESTRUTURA DE CONFIGURAÇÃO DO EDITOR     */
+                /* ======================================== */
+                var _editorConfig = {
+                    layers: {},
+                    tools: {
+                        activeTool: null,
+                        drawType: null,
+                        freehand: false
+                    },
+                    ui: {
+                        showToolbarLabels: _showToolbarLabels,
+                        toolbarPosition: _toolbarPosition,
+                        layerControlCollapsed: false
+                    },
+                    map: {
+                        center: null,
+                        zoom: null
+                    }
+                };
+                
+                /* ======================================== */
+                /* FUNÇÕES DE ATUALIZAÇÃO DE CAMPOS        */
+                /* ======================================== */
+                function updateGeometryField(value) {
+                    if (!_geometryFieldId) return;
+                    
+                    var field = document.getElementById(_geometryFieldId);
+                    if (field) {
+                        field.value = value;
+                        field.dispatchEvent(new Event('change', { bubbles: true }));
+                        console.log('✅ Campo geometria atualizado');
+                    }
+                }
+                
+                function updateEditorConfigField() {
+                    if (!_editorConfigFieldId) {
+                        return;
+                    }
+                    
+                    console.log('📝 updateEditorConfigField');
+                    
+                    /* Atualizar configurações das camadas */
+                    var layerNames = Object.keys(_layerConfigs);
+                    layerNames.forEach(function(name, index) {
+                        var olLayer = _olLayers[index];
+                        if (olLayer) {
+                            _editorConfig.layers[name] = {
+                                visible: olLayer.getVisible(),
+                                opacity: olLayer.getOpacity()
+                            };
+                        }
+                    });
+                    
+                    /* Atualizar configurações do mapa */
+                    if (_map) {
+                        var view = _map.getView();
+                        _editorConfig.map.center = view.getCenter();
+                        _editorConfig.map.zoom = view.getZoom();
+                    }
+                    
+                    /* Atualizar configurações da UI */
+                    _editorConfig.ui.layerControlCollapsed = _isLayerControlCollapsed;
+                    
+                    var configJson = JSON.stringify(_editorConfig);
+                    console.log('  Configurações:', configJson);
+                    
+                    var field = document.getElementById(_editorConfigFieldId);
+                    if (field) {
+                        field.value = configJson;
+                        field.dispatchEvent(new Event('change', { bubbles: true }));
+                        console.log('✅ Configurações atualizadas no campo ' + _editorConfigFieldId);
+                    }
+                }
+                window.updateEditorConfigField = updateEditorConfigField;
+                
+                /* ======================================== */
+                /* FUNÇÃO PARA RESTAURAR CONFIGURAÇÕES     */
+                /* ======================================== */
+                function restoreEditorConfig(configData) {
+                    if (!configData) {
+                        console.log('⚠️ Nenhum dado de configuração para restaurar');
+                        return;
+                    }
+                    
+                    console.log('📌 Restaurando configurações do editor');
+                    
+                    try {
+                        var config = typeof configData === 'string' ? JSON.parse(configData) : configData;
+                        
+                        /* Restaurar camadas */
+                        if (config.layers) {
+                            Object.keys(config.layers).forEach(function(name) {
+                                var settings = config.layers[name];
+                                var index = Object.keys(_layerConfigs).indexOf(name);
+                                
+                                if (index !== -1 && _olLayers[index]) {
+                                    var olLayer = _olLayers[index];
+                                    if (settings.visible !== undefined) {
+                                        olLayer.setVisible(settings.visible);
+                                        var checkbox = document.getElementById('layer_chk_' + name);
+                                        if (checkbox) {
+                                            checkbox.checked = settings.visible;
+                                        }
+                                    }
+                                    if (settings.opacity !== undefined) {
+                                        olLayer.setOpacity(settings.opacity);
+                                        var slider = document.getElementById('layer_opacity_' + name);
+                                        if (slider) {
+                                            slider.value = Math.round(settings.opacity * 100);
+                                            var label = slider.parentNode.querySelector('span');
+                                            if (label) {
+                                                label.textContent = Math.round(settings.opacity * 100) + '%';
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        
+                        /* Restaurar UI */
+                        if (config.ui) {
+                            if (config.ui.layerControlCollapsed !== undefined) {
+                                _isLayerControlCollapsed = config.ui.layerControlCollapsed;
+                                var bodyEl = document.getElementById('layer_control_body');
+                                var icon = document.querySelector('#layer_toggle_btn i');
+                                if (bodyEl && icon) {
+                                    if (_isLayerControlCollapsed) {
+                                        bodyEl.style.display = 'none';
+                                        icon.className = 'fas fa-chevron-down';
+                                    } else {
+                                        bodyEl.style.display = 'block';
+                                        icon.className = 'fas fa-chevron-up';
+                                    }
+                                }
+                            }
+                        }
+                        
+                        /* Restaurar ferramentas */
+                        if (config.tools && config.tools.activeTool) {
+                            var toolName = config.tools.activeTool;
+                            console.log('  🔧 Restaurando ferramenta: ' + toolName);
+                            /* A ativação da ferramenta será feita via evento */
+                            var event = new CustomEvent('restoreTool', {
+                                detail: { tool: toolName }
+                            });
+                            document.dispatchEvent(event);
+                        }
+                        
+                        /* Atualizar campo de configurações após restaurar */
+                        setTimeout(function() {
+                            updateEditorConfigField();
+                        }, 100);
+                        
+                        console.log('✅ Configurações restauradas');
+                    } catch(e) {
+                        console.error('❌ Erro ao restaurar configurações:', e);
+                    }
+                }
+                window.restoreEditorConfig = restoreEditorConfig;
                 
                 /* ======================================== */
                 /* FUNÇÃO PARA CONVERTER GEOMETRIA PARA SALVAR */
@@ -363,8 +616,8 @@ class OpenLayersEditor extends TElement
                 /* ======================================== */
                 /* FUNÇÃO PARA ATUALIZAR CAMPO GEOM        */
                 /* ======================================== */
-                function updateGeometryField() {
-                    console.log('📝 updateGeometryField');
+                function updateGeometryFieldValue() {
+                    console.log('📝 updateGeometryFieldValue');
                     if (!_source) return;
                     
                     var currentFeatures = _source.getFeatures();
@@ -383,10 +636,7 @@ class OpenLayersEditor extends TElement
                             var fullGeojson = generateFullGeoJSON(currentFeatures);
                             
                             if (fullGeojson) {
-                                var event = new CustomEvent('geometryChanged', {
-                                    detail: { geometry: fullGeojson }
-                                });
-                                document.dispatchEvent(event);
+                                updateGeometryField(fullGeojson);
                                 console.log('✅ Geometria atualizada (' + currentFeatures.length + ' features)');
                             } else {
                                 console.warn('⚠️ Não foi possível gerar GeoJSON válido');
@@ -395,14 +645,13 @@ class OpenLayersEditor extends TElement
                             console.error('❌ Erro ao atualizar geometria:', e);
                         }
                     } else {
-                        var event = new CustomEvent('geometryChanged', {
-                            detail: { geometry: null }
-                        });
-                        document.dispatchEvent(event);
+                        updateGeometryField(null);
                         console.log('✅ Geometria removida (vazio)');
                     }
+                    
+                    /* Atualizar também as configurações do editor */
+                    updateEditorConfigField();
                 }
-                window.updateGeometryField = updateGeometryField;
                 
                 /* ======================================== */
                 /* SALVAR ESTADO                          */
@@ -549,7 +798,7 @@ class OpenLayersEditor extends TElement
                     _map.renderSync();
                     _map.updateSize();
                     
-                    updateGeometryField();
+                    updateGeometryFieldValue();
                     updateUndoRedoButtons();
                     
                     _isUndoRedo = false;
@@ -641,7 +890,7 @@ class OpenLayersEditor extends TElement
                         
                         console.log('✅ Ponto adicionado com sucesso');
                         saveToHistory();
-                        updateGeometryField();
+                        updateGeometryFieldValue();
                         return true;
                     } catch(e) {
                         console.error('❌ Erro ao adicionar ponto:', e);
@@ -724,7 +973,6 @@ class OpenLayersEditor extends TElement
                     container.style.cssText = 'position:absolute;bottom:10px;right:10px;z-index:1000;background:white;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.3);min-width:200px;max-height:350px;overflow:hidden;font-family:Arial,sans-serif;font-size:12px;cursor:default;';
                     container.className = 'layer-control-draggable';
                     
-                    /* Barra de título com ícone de arraste */
                     var header = document.createElement('div');
                     header.id = 'layer_control_header';
                     header.style.cssText = 'padding:8px 12px;background:#f8f9fa;border-bottom:1px solid #dee2e6;font-weight:bold;cursor:move;display:flex;justify-content:space-between;align-items:center;user-select:none;';
@@ -779,6 +1027,8 @@ class OpenLayersEditor extends TElement
                                     opacitySlider.disabled = !isChecked;
                                     opacitySlider.style.opacity = isChecked ? '1' : '0.5';
                                 }
+                                
+                                updateEditorConfigField();
                             };
                             item.appendChild(checkbox);
                             
@@ -814,6 +1064,10 @@ class OpenLayersEditor extends TElement
                                     label.textContent = Math.round(value * 100) + '%';
                                 }
                             };
+                            
+                            opacityInput.onchange = function() {
+                                updateEditorConfigField();
+                            };
                             opacityContainer.appendChild(opacityInput);
                             
                             item.appendChild(opacityContainer);
@@ -821,7 +1075,6 @@ class OpenLayersEditor extends TElement
                         });
                     }
                     
-                    /* Função toggle */
                     function toggleLayerControl() {
                         var bodyEl = document.getElementById('layer_control_body');
                         var icon = document.querySelector('#layer_toggle_btn i');
@@ -838,6 +1091,7 @@ class OpenLayersEditor extends TElement
                             _isLayerControlCollapsed = true;
                             console.log('📁 Controle de camadas recolhido');
                         }
+                        updateEditorConfigField();
                     }
                     
                     toggleBtn.onclick = function(e) {
@@ -1013,7 +1267,7 @@ class OpenLayersEditor extends TElement
                     draw.on('drawend', function() {
                         console.log('🟢 DRAWEND');
                         saveToHistory();
-                        updateGeometryField();
+                        updateGeometryFieldValue();
                         setDrawCursor(false);
                     });
                     
@@ -1282,7 +1536,7 @@ class OpenLayersEditor extends TElement
                     _modify.on('modifyend', function(e) {
                         console.log('🔴 MODIFYEND - SALVANDO!');
                         saveToHistory();
-                        updateGeometryField();
+                        updateGeometryFieldValue();
                     });
                     
                     /* ======================================== */
@@ -1292,7 +1546,7 @@ class OpenLayersEditor extends TElement
                         console.log('🟡 SOURCE.CHANGE');
                         if (!_isUndoRedo) {
                             saveToHistory();
-                            updateGeometryField();
+                            updateGeometryFieldValue();
                         }
                     });
                     console.log('✅ source.on(change) configurado');
@@ -1341,7 +1595,7 @@ class OpenLayersEditor extends TElement
                             geometry.setCoordinates(polygonCoords);
                             _source.changed();
                             saveToHistory();
-                            updateGeometryField();
+                            updateGeometryFieldValue();
                             console.log('✅ Vertice inserido');
                         }
                     });
@@ -1384,7 +1638,7 @@ class OpenLayersEditor extends TElement
                     _translate.on('translateend', function() {
                         console.log('🔵 TRANSLATEEND');
                         saveToHistory();
-                        updateGeometryField();
+                        updateGeometryFieldValue();
                     });
                     
                     /* ======================================== */
@@ -1419,7 +1673,7 @@ class OpenLayersEditor extends TElement
                             _source.removeFeature(feature);
                             selected.clear();
                             saveToHistory();
-                            updateGeometryField();
+                            updateGeometryFieldValue();
                             console.log('✅ Feature deletada');
                         }
                     });
@@ -1444,7 +1698,7 @@ class OpenLayersEditor extends TElement
                     
                     setTimeout(function() {
                         saveToHistory();
-                        updateGeometryField();
+                        updateGeometryFieldValue();
                     }, 500);
                     
                     if ({$showToolbar}) {
@@ -1473,7 +1727,6 @@ class OpenLayersEditor extends TElement
                     var toolbarButtons = {$toolbarButtons};
                     var buttonConfigs = [];
                     
-                    /* Configurar botões */
                     if (toolbarButtons.select) {
                         buttonConfigs.push({
                             key: 'select',
@@ -1486,6 +1739,8 @@ class OpenLayersEditor extends TElement
                                 if (_modify) _modify.setActive(false); 
                                 if (_draw && typeof _draw.setActive === 'function') _draw.setActive(false);
                                 setDrawCursor(false);
+                                _editorConfig.tools.activeTool = 'select';
+                                updateEditorConfigField();
                                 console.log('🔍 Selecionar');
                             }
                         });
@@ -1514,6 +1769,8 @@ class OpenLayersEditor extends TElement
                                 if (_draw && typeof _draw.setActive === 'function') _draw.setActive(false); 
                                 if (_select) _select.setActive(false);
                                 setDrawCursor(false);
+                                _editorConfig.tools.activeTool = 'modify';
+                                updateEditorConfigField();
                                 console.log('🔧 Modificar');
                             }
                         });
@@ -1553,20 +1810,17 @@ class OpenLayersEditor extends TElement
                         var b = document.createElement('button');
                         b.style.cssText = 'padding:5px 10px;border:1px solid #ccc;border-radius:3px;background:#f8f9fa;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;';
                         
-                        /* Ícone */
                         var iconSpan = document.createElement('span');
                         iconSpan.className = 'fas ' + btn.icon;
                         iconSpan.style.cssText = 'font-size:14px;';
                         b.appendChild(iconSpan);
                         
-                        /* Label (se showToolbarLabels for true) */
                         if (_showToolbarLabels) {
                             var labelSpan = document.createElement('span');
                             labelSpan.textContent = btn.label;
                             b.appendChild(labelSpan);
                         }
                         
-                        /* Tooltip (hint) */
                         b.title = btn.hint || btn.label;
                         
                         if (btn.isUndo) {
@@ -1634,6 +1888,11 @@ class OpenLayersEditor extends TElement
                                     if (_draw && typeof _draw.setActive === 'function') {
                                         _draw.setActive(true);
                                     }
+                                    
+                                    _editorConfig.tools.activeTool = 'draw';
+                                    _editorConfig.tools.drawType = item.type;
+                                    _editorConfig.tools.freehand = item.freehand;
+                                    updateEditorConfigField();
                                     
                                     submenu.style.display = 'none';
                                     _drawSubmenuOpen = false;
