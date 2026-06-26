@@ -42,45 +42,45 @@ class OpenLayersEditor extends TElement
         $defaultAssetsPath = 'vendor/marcelonees/topenlayerseditor/src/OpenLayersEditor/';
 
         $defaultButtons = [
-            'select' => ['icon' => 'fa-mouse-pointer', 'label' => 'Selecionar', 'hint' => 'Selecionar geometria'],
-            'draw'   => ['icon' => 'fa-pencil', 'label' => 'Desenhar', 'hint' => 'Desenhar nova geometria'],
-            'modify' => ['icon' => 'fa-edit', 'label' => 'Modificar', 'hint' => 'Modificar geometria existente'],
-            'undo'   => ['icon' => 'fa-undo', 'label' => 'Voltar', 'hint' => 'Desfazer última ação (Ctrl+Z)'],
-            'redo'   => ['icon' => 'fa-redo', 'label' => 'Refazer', 'hint' => 'Refazer ação desfeita (Ctrl+Y)']
+            'select' => ['icon' => 'fa-mouse-pointer',  'label' => 'Selecionar',    'hint' => 'Selecionar geometria'],
+            'draw'   => ['icon' => 'fa-pencil',         'label' => 'Desenhar',      'hint' => 'Desenhar nova geometria'],
+            'modify' => ['icon' => 'fa-edit',           'label' => 'Modificar',     'hint' => 'Modificar geometria existente'],
+            'undo'   => ['icon' => 'fa-undo',           'label' => 'Voltar',        'hint' => 'Desfazer última ação (Ctrl+Z)'],
+            'redo'   => ['icon' => 'fa-redo',           'label' => 'Refazer',       'hint' => 'Refazer ação desfeita (Ctrl+Y)']
         ];
 
         $defaultLayers = [
             'osm' => [
-                'type' => 'tile',
-                'source' => 'osm',
-                'opacity' => 0.3,
-                'visible' => true,
-                'title' => 'OpenStreetMap'
+                'type'      => 'tile',
+                'source'    => 'osm',
+                'opacity'   => 0.3,
+                'visible'   => true,
+                'title'     => 'OpenStreetMap'
             ]
         ];
 
         $this->options = array_merge([
-            'showToolbar' => true,
-            'toolbarButtons' => $defaultButtons,
-            'assetsPath' => $defaultAssetsPath,
-            'center' => [-49.0904928, -26.504104],
-            'zoom' => 15,
-            'freehand' => false,
-            'showLayerControl' => true,
-            'layers' => $defaultLayers,
+            'showToolbar'       => true,
+            'toolbarButtons'    => $defaultButtons,
+            'assetsPath'        => $defaultAssetsPath,
+            'center'            => [-49.0904928, -26.504104],
+            'zoom'              => 15,
+            'freehand'          => false,
+            'showLayerControl'  => true,
+            'layers'            => $defaultLayers,
             'showToolbarLabels' => true,
-            'toolbarPosition' => 'top-right',
+            'toolbarPosition'   => 'top-right',
             'editorConfigField' => null,
-            'geometryField' => null,
-            'restoreConfig' => null
+            'geometryField'     => null,
+            'restoreConfig'     => null
         ], $options);
 
-        $this->center = $this->options['center'];
-        $this->zoom = $this->options['zoom'];
-        $this->layers = $this->options['layers'];
-        $this->editorConfigFieldId = $this->options['editorConfigField'];
-        $this->geometryFieldId = $this->options['geometryField'];
-        $this->restoreConfigData = $this->options['restoreConfig'];
+        $this->center               = $this->options['center'];
+        $this->zoom                 = $this->options['zoom'];
+        $this->layers               = $this->options['layers'];
+        $this->editorConfigFieldId  = $this->options['editorConfigField'];
+        $this->geometryFieldId      = $this->options['geometryField'];
+        $this->restoreConfigData    = $this->options['restoreConfig'];
     }
 
     /**
