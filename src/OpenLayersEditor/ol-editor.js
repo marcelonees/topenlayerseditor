@@ -1,6 +1,6 @@
 /**
  * OpenLayers Editor - Gerenciador de edição de geometrias
- * @version 1.3
+ * @version 1.4 - Suporte a fitToGeometry (controle de auto-zoom)
  * @author Marcelo Barreto Nees <marcelo.linux@gmail.com>
  * @license MIT
  */
@@ -82,10 +82,16 @@
             zoom: 15,
             restoreConfig: null,
             geom: null,
+            /* Controla o auto-fit na geometria inicial:
+             * null  = automático (faz fit se houver geometria)
+             * false = não faz fit (respeita zoom/center definidos)
+             * true  = força o fit
+             */
+            fitToGeometry: null,
         };
 
         /* ======================================== */
-        /* INICIALIZAÇÃO                           */
+        /* INICIALIZAÇÃO                            */
         /* ======================================== */
         function _initEditor(config) {
             if (_initialized) {
@@ -128,7 +134,7 @@
             const zoom = _config.zoom;
 
             /* ======================================== */
-            /* CRIAR CAMADAS DO MAPA                   */
+            /* CRIAR CAMADAS DO MAPA                    */
             /* ======================================== */
             _olLayers = [];
             _layerConfigs = {};
@@ -193,7 +199,7 @@
             }
 
             /* ======================================== */
-            /* CRIAR MAPA                              */
+            /* CRIAR MAPA                               */
             /* ======================================== */
             let controls;
             if (ol.control && typeof ol.control.defaults === "function") {
@@ -241,7 +247,7 @@
             console.log("✅ Mapa criado");
 
             /* ======================================== */
-            /* CONTROLE DE CAMADAS                     */
+            /* CONTROLE DE CAMADAS                      */
             /* ======================================== */
             if (_config.showLayerControl) {
                 const layerControl = _createLayerControl(
@@ -253,7 +259,7 @@
             }
 
             /* ======================================== */
-            /* CRIAR SOURCE E CAMADA DE EDIÇÃO         */
+            /* CRIAR SOURCE E CAMADA DE EDIÇÃO          */
             /* ======================================== */
             _source = new ol.source.Vector({ features: features });
             console.log(`✅ Source criada com ${features.length} features`);
@@ -271,30 +277,73 @@
             console.log("✅ Camada de edição adicionada ao mapa");
 
             /* ======================================== */
-            /* INTERAÇÕES                              */
+            /* INTERAÇÕES                               */
             /* ======================================== */
             _setupInteractions();
 
             /* ======================================== */
-            /* HISTÓRICO                              */
+            /* HISTÓRICO                                */
             /* ======================================== */
             _setupHistory();
 
             /* ======================================== */
-            /* TOOLBAR                                */
+            /* TOOLBAR                                  */
             /* ======================================== */
             if (_config.showToolbar) {
                 _addToolbar(container);
             }
 
             /* ======================================== */
-            /* AJUSTAR VISÃO PARA A GEOMETRIA INICIAL  */
+            /* AJUSTAR VISÃO PARA A GEOMETRIA INICIAL   */
             /* ======================================== */
             if (features && features.length > 0) {
                 setTimeout(function () {
                     _map.updateSize();
                     console.log("✅ Map.updateSize() executado");
-                    _fitToGeometry(features);
+
+                    /* Respeita a flag fitToGeometry:
+                    *  - false  → NÃO faz fit; mantém o zoom definido mas CENTRALIZA na geometria
+                    *  - true   → força fit (enquadra a geometria)
+                    *  - null   → comportamento automático (fit)
+                    */
+                    if (_config.fitToGeometry === false) {
+                        console.log(
+                            "📌 fitToGeometry=false: mantendo zoom e centralizando na geometria",
+                        );
+
+                        /* Centraliza na geometria para garantir visibilidade,
+                        * mantendo o zoom explicitamente definido.
+                        */
+                        try {
+                            const tempSource = new ol.source.Vector({
+                                features: features,
+                            });
+                            const extent = tempSource.getExtent();
+
+                            if (extent && isFinite(extent[0])) {
+                                const geomCenter = ol.extent.getCenter(extent);
+                                _map.getView().setCenter(geomCenter);
+                                _map.getView().setZoom(zoom);
+                                console.log(
+                                    "📌 Centro ajustado para a geometria, zoom mantido:",
+                                    zoom,
+                                );
+                            } else {
+                                /* Fallback: usa o center do config */
+                                _map.getView().setCenter(center);
+                                _map.getView().setZoom(zoom);
+                            }
+                        } catch (e) {
+                            console.warn(
+                                "⚠️ Erro ao centralizar na geometria:",
+                                e,
+                            );
+                            _map.getView().setCenter(center);
+                            _map.getView().setZoom(zoom);
+                        }
+                    } else {
+                        _fitToGeometry(features);
+                    }
                 }, 500);
             } else {
                 setTimeout(function () {
@@ -302,7 +351,6 @@
                     console.log("✅ Map.updateSize() executado");
                 }, 100);
             }
-
             console.log("✅ Editor pronto!");
             console.log(`📌 Histórico: ${_history.length} estados`);
 
@@ -825,14 +873,14 @@
         function _updateField(fieldId, value) {
             if (!fieldId) return;
 
-            // IMPORTANTE: Usa querySelectorAll para pegar o ÚLTIMO campo com o ID
+            /* IMPORTANTE: Usa querySelectorAll para pegar o ÚLTIMO campo com o ID */
             const allFields = document.querySelectorAll("#" + fieldId);
             if (allFields.length === 0) {
                 console.warn(`⚠️ Campo ${fieldId} não encontrado`);
                 return;
             }
 
-            const field = allFields[allFields.length - 1]; // Pega o último
+            const field = allFields[allFields.length - 1]; /* Pega o último */
             if (field) {
                 field.value = value;
                 field.dispatchEvent(new Event("change", { bubbles: true }));
@@ -1415,8 +1463,8 @@
 
             buttonConfigs.forEach(function (btn) {
                 const b = document.createElement("button");
-                b.type =
-                    "button"; /* Garantir que o botão não submeta o formulário */
+                /* Garantir que o botão não submeta o formulário */
+                b.type = "button";
                 b.className = "ol-editor-toolbar-btn";
 
                 const iconSpan = document.createElement("span");
@@ -1678,7 +1726,7 @@
         }
 
         /* ======================================== */
-        /* FUNÇÕES PÚBLICAS                        */
+        /* FUNÇÕES PÚBLICAS                         */
         /* ======================================== */
         function getMap() {
             return _map;
@@ -1702,7 +1750,32 @@
 
                 if (features && features.length > 0) {
                     setTimeout(function () {
-                        _fitToGeometry(features);
+                        /* Respeita fitToGeometry=false também em
+                        * chamadas dinâmicas de setGeometry()
+                        */
+                        if (_config.fitToGeometry === false) {
+                            console.log(
+                                "📌 fitToGeometry=false: setGeometry centralizando sem alterar zoom",
+                            );
+                            try {
+                                const tempSource = new ol.source.Vector({
+                                    features: features,
+                                });
+                                const extent = tempSource.getExtent();
+                                if (extent && isFinite(extent[0])) {
+                                    const geomCenter = ol.extent.getCenter(extent);
+                                    _map.getView().setCenter(geomCenter);
+                                    /* Não mexe no zoom — mantém o atual */
+                                }
+                            } catch (e) {
+                                console.warn(
+                                    "⚠️ Erro ao centralizar na geometria:",
+                                    e,
+                                );
+                            }
+                        } else {
+                            _fitToGeometry(features);
+                        }
                     }, 300);
                 }
 
@@ -1730,7 +1803,7 @@
                         ? JSON.parse(configData)
                         : configData;
 
-                // Atualiza as camadas
+                /* Atualiza as camadas */
                 if (config.layers) {
                     Object.keys(config.layers).forEach(function (name) {
                         const settings = config.layers[name];
@@ -1739,11 +1812,11 @@
                         if (index !== -1 && _olLayers[index]) {
                             const olLayer = _olLayers[index];
 
-                            // Atualiza visibilidade
+                            /* Atualiza visibilidade */
                             if (settings.visible !== undefined) {
                                 olLayer.setVisible(settings.visible);
 
-                                // Atualiza checkbox - USA querySelectorAll com último
+                                /* Atualiza checkbox - USA querySelectorAll com último */
                                 const allCheckboxes = document.querySelectorAll(
                                     "#layer_chk_" + name,
                                 );
@@ -1755,7 +1828,7 @@
                                     }
                                 }
 
-                                // Atualiza slider de opacidade - USA querySelectorAll com último
+                                /* Atualiza slider de opacidade - USA querySelectorAll com último */
                                 const allSliders = document.querySelectorAll(
                                     "#layer_opacity_" + name,
                                 );
@@ -1771,7 +1844,7 @@
                                 }
                             }
 
-                            // Atualiza opacidade
+                            /* Atualiza opacidade */
                             if (settings.opacity !== undefined) {
                                 olLayer.setOpacity(settings.opacity);
 
@@ -1802,7 +1875,7 @@
                     });
                 }
 
-                // Atualiza estado do controle de camadas - USA querySelectorAll com último
+                /* Atualiza estado do controle de camadas - USA querySelectorAll com último */
                 if (config.ui) {
                     if (config.ui.layerControlCollapsed !== undefined) {
                         _isLayerControlCollapsed =
@@ -1832,7 +1905,7 @@
                     }
                 }
 
-                // Restaura ferramenta ativa
+                /* Restaura ferramenta ativa */
                 if (config.tools && config.tools.activeTool) {
                     const toolName = config.tools.activeTool;
                     console.log("  🔧 Restaurando ferramenta: " + toolName);
@@ -1841,7 +1914,7 @@
                         const allButtons = document.querySelectorAll(
                             ".ol-editor-toolbar-btn",
                         );
-                        // Procura pelo botão que corresponde à ferramenta
+                        /* Procura pelo botão que corresponde à ferramenta */
                         allButtons.forEach(function (btn) {
                             const label = btn.querySelector(
                                 ".ol-editor-toolbar-btn-label",
@@ -1857,7 +1930,7 @@
                     }, 200);
                 }
 
-                // Atualiza campo de configuração
+                /* Atualiza campo de configuração */
                 setTimeout(function () {
                     _updateEditorConfigField();
                 }, 100);
@@ -1869,7 +1942,7 @@
         }
 
         /* ======================================== */
-        /* API PÚBLICA                             */
+        /* API PÚBLICA                              */
         /* ======================================== */
         return {
             init: function (config) {

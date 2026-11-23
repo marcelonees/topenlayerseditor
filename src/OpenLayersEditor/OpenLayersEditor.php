@@ -11,7 +11,7 @@ use Exception;
  * OpenLayersEditor - Componente para edição de geometrias
  * 
  * @author Marcelo Barreto Nees <marcelo.linux@gmail.com>
- * @version 1.3 - Arquivos javascript e css separados
+ * @version 1.4 - Adiciona setFitToGeometry() para controlar o auto-zoom
  * @package MarceloNees\Plugins\OpenLayersEditor
  */
 class OpenLayersEditor extends TElement
@@ -28,6 +28,7 @@ class OpenLayersEditor extends TElement
     private $editorConfigFieldId = null;
     private $geometryFieldId = null;
     private $restoreConfigData = null;
+    private $fitToGeometry = null;
 
     /**
      * Class Constructor
@@ -72,7 +73,8 @@ class OpenLayersEditor extends TElement
             'toolbarPosition'   => 'top-right',
             'editorConfigField' => null,
             'geometryField'     => null,
-            'restoreConfig'     => null
+            'restoreConfig'     => null,
+            'fitToGeometry'     => null
         ], $options);
 
         $this->center               = $this->options['center'];
@@ -81,6 +83,7 @@ class OpenLayersEditor extends TElement
         $this->editorConfigFieldId  = $this->options['editorConfigField'];
         $this->geometryFieldId      = $this->options['geometryField'];
         $this->restoreConfigData    = $this->options['restoreConfig'];
+        $this->fitToGeometry        = $this->options['fitToGeometry'];
     }
 
     /**
@@ -141,6 +144,24 @@ class OpenLayersEditor extends TElement
     public function setZoom($zoom)
     {
         $this->zoom = $zoom;
+        return $this;
+    }
+
+    /**
+     * Controla se o editor deve ajustar a visão para a geometria inicial.
+     *
+     * - null (padrão): comportamento automático (ajusta se houver geometria)
+     * - false: NÃO ajusta; respeita o zoom/center definidos via setZoom/setCenter
+     * - true: força o ajuste para a geometria
+     *
+     * Útil quando você define um zoom fixo via setZoom() e quer que ele seja
+     * respeitado mesmo com geometria inicial. Sem isso, view.fit() sobrescreve
+     * o zoom definido.
+     */
+    public function setFitToGeometry($enabled)
+    {
+        $this->fitToGeometry = ($enabled === null) ? null : (bool) $enabled;
+        $this->options['fitToGeometry'] = $this->fitToGeometry;
         return $this;
     }
 
@@ -304,6 +325,13 @@ class OpenLayersEditor extends TElement
         $toolbarButtons = json_encode($this->options['toolbarButtons']);
         $restoreConfigData = $this->restoreConfigData ? json_encode($this->restoreConfigData) : 'null';
 
+        /* fitToGeometry: null = auto, true = força fit, false = respeita zoom/center */
+        if ($this->fitToGeometry === null) {
+            $fitToGeometry = 'null';
+        } else {
+            $fitToGeometry = $this->fitToGeometry ? 'true' : 'false';
+        }
+
         /* Garante que o CSS seja carregado primeiro */
         TStyle::importFromFile('vendor/marcelonees/topenlayerseditor/src/OpenLayersEditor/ol.css');
         TStyle::importFromFile('vendor/marcelonees/topenlayerseditor/src/OpenLayersEditor/ol-editor.css');
@@ -349,7 +377,8 @@ class OpenLayersEditor extends TElement
                     showLayerControl: {$showLayerControl},
                     toolbarButtons: {$toolbarButtons},
                     layers: {$layersJson},
-                    geom: {$geomJson}
+                    geom: {$geomJson},
+                    fitToGeometry: {$fitToGeometry}
                 };
                 
                 /* Adicionar restoreConfig se existir */
